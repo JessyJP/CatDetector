@@ -90,12 +90,14 @@ def cat_detector(video_path, skip_frames, output_dir):
             bbox = is_cat_or_dog(frame, yolo)
             if bbox:
                 add_overlay(frame, bbox)
-                output_path = os.path.join(output_dir, f"Detected-cat_or_dog-{saved_count:04d}-{timestamp}s.png")
+                output_path = os.path.join(output_dir, f"Detected-cat_or_dog-{saved_count:04d}-{timestamp}s.png")                
                 cv2.imwrite(output_path, frame)
+                print(f"{output_path}")
                 saved_count += 1
 
             checked_output_path = os.path.join(output_dir, f"Checked-{timestamp}s.png")
-            cv2.imwrite(checked_output_path, frame)
+            # cv2.imwrite(checked_output_path, frame)
+            print(f"{checked_output_path}")
 
         frame_count += 1
 
