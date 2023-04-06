@@ -49,55 +49,35 @@ def is_cat(frame):
 
     return False
 
-def is_cat_or_dog(frame):
-    img = cv2.resize(frame, (224, 224))
-    img = image.img_to_array(img)
-    img = np.expand_dims(img, axis=0)
-    img = preprocess_input(img)
+from yolov4.tf import YOLOv4
 
-    model = MobileNetV2(weights='imagenet', include_top=True)
-    preds = model.predict(img)
-    decoded_preds = tf.keras.applications.mobilenet_v2.decode_predictions(preds, top=5)
+def is_cat_or_dog(frame, yolo):
+    img = cv2.resize(frame, (yolo.input_size, yolo.input_size))
+    img = img / 255.0
 
-    cat_classes = [
-        'Egyptian_cat',
-        'tiger_cat',
-        'tabby',
-        'Persian_cat',
-        'Siamese_cat',
-        'Maine_Coon',
-    ]
+    boxes, _, classes = yolo.predict(img)
 
-    dog_classes = [
-        'Labrador_retriever',
-        'golden_retriever',
-        'German_shepherd',
-        'beagle',
-        'boxer',
-        'bulldog',
-        'Rottweiler',
-        'poodle',
-        'Great_Dane',
-        'Dalmatian',
-    ]
+    cat_dog_classes = [16, 17]  # In COCO dataset, 16 = dog, 17 = cat
 
-    for pred in decoded_preds[0]:
-        if pred[1] in cat_classes or pred[1] in dog_classes:
-            return True
+    for i, class_id in enumerate(classes):
+        if class_id in cat_dog_classes:
+            return boxes[i]
 
-    return False
+    return None
 
-
-def add_overlay(frame, bbox, confidence):
+def add_overlay(frame, bbox, color=(0, 255, 0)):
     x, y, w, h = bbox
-    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-    text = f"{confidence:.2%}"
-    cv2.putText(frame, text, (x, y + h - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
 
 def cat_detector(video_path, skip_frames, output_dir):
     cap = cv2.VideoCapture(video_path)
     frame_count = 0
     saved_count = 0
+
+    yolo = YOLOv4()
+    yolo.classes = "coco.names"
+    yolo.make_model()
+    yolo.load_weights("yolov4.weights", weights_type="yolo")
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -107,7 +87,9 @@ def cat_detector(video_path, skip_frames, output_dir):
         if frame_count % skip_frames == 0:
             timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) // 1000  # Get timestamp in seconds
 
-            if is_cat_or_dog(frame):
+            bbox = is_cat_or_dog(frame, yolo)
+            if bbox:
+                add_overlay(frame, bbox)
                 output_path = os.path.join(output_dir, f"Detected-cat_or_dog-{saved_count:04d}-{timestamp}s.png")
                 cv2.imwrite(output_path, frame)
                 saved_count += 1
@@ -119,6 +101,7 @@ def cat_detector(video_path, skip_frames, output_dir):
 
     cap.release()
     cv2.destroyAllWindows()
+
 
 
 def main():
